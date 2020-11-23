@@ -257,7 +257,7 @@ Change::applyAmendment()
             sleDst->setFieldAmount(sfBalance, sleDst->getFieldAmount(sfBalance) + injectionDropsCSCAmount);
             // increase the total coin supply in the ledger
             ctx_.redistributeCSC(injectionDropsCSCAmount);
-            JLOG (j_.info()) << "CoinInjection distributed " << injectionDrops " drops to account " << dstAccountID;
+            JLOG (j_.info()) << "CoinInjection distributed " << injectionDrops << " drops to account " << dstAccountID;
         }
 
         if (!ctx_.app.getAmendmentTable ().isSupported (amendment))
