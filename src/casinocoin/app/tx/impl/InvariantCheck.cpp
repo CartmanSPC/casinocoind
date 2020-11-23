@@ -82,6 +82,60 @@ CSCNotCreated::visitEntry(
     }
 }
 
+void
+CSCNotCreated::visitEntryInjection(
+    uint256 const&,
+    bool isDelete,
+    std::shared_ptr <SLE const> const& before,
+    std::shared_ptr <SLE const> const& after)
+{
+    if(before)
+    {
+        switch (before->getType())
+        {
+        case ltACCOUNT_ROOT:
+            drops_ -= (*before)[sfBalance].csc().drops();
+            break;
+        case ltPAYCHAN:
+            drops_ -= ((*before)[sfAmount] - (*before)[sfBalance]).csc().drops();
+            break;
+        case ltESCROW:
+            drops_ -= (*before)[sfAmount].csc().drops();
+            break;
+            // jrojek: inverted logic, because we store here the amount of drops distributed
+        case ltCRN_ROUND:
+            drops_ += (*before)[sfCRN_FeeDistributed].csc().drops();
+            break;
+        default:
+            break;
+        }
+    }
+
+    if(after)
+    {
+        switch (after->getType())
+        {
+        case ltACCOUNT_ROOT:
+            drops_ += (*after)[sfBalance].csc().drops();
+            break;
+        case ltPAYCHAN:
+            if (! isDelete)
+                drops_ += ((*after)[sfAmount] - (*after)[sfBalance]).csc().drops();
+            break;
+        case ltESCROW:
+            if (! isDelete)
+                drops_ += (*after)[sfAmount].csc().drops();
+            break;
+            // jrojek: inverted logic, because we store here the amount of drops distributed
+        case ltCRN_ROUND:
+            drops_ -= (*after)[sfCRN_FeeDistributed].csc().drops();
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 bool
 CSCNotCreated::finalize(STTx const& tx, TER /*tec*/, beast::Journal const& j)
 {
@@ -138,6 +192,39 @@ CSCBalanceChecks::visitEntry(
         bad_ |= isBad ((*after)[sfBalance]);
 }
 
+void
+CSCBalanceChecks::visitEntryInjection(
+    uint256 const&,
+    bool,
+    std::shared_ptr <SLE const> const& before,
+    std::shared_ptr <SLE const> const& after)
+{
+    auto isBad = [](STAmount const& balance)
+    {
+        if (!balance.native())
+            return true;
+
+        auto const drops = balance.csc().drops();
+
+        // Can't have more than the number of drops instantiated
+        // in the genesis ledger.
+        if (drops > SYSTEM_CURRENCY_INJECTION)
+            return true;
+
+        // Can't have a negative balance (0 is OK)
+        if (drops < 0)
+            return true;
+
+        return false;
+    };
+
+    if(before && before->getType() == ltACCOUNT_ROOT)
+        bad_ |= isBad ((*before)[sfBalance]);
+
+    if(after && after->getType() == ltACCOUNT_ROOT)
+        bad_ |= isBad ((*after)[sfBalance]);
+}
+
 bool
 CSCBalanceChecks::finalize(STTx const&, TER, beast::Journal const& j)
 {
@@ -154,6 +241,33 @@ CSCBalanceChecks::finalize(STTx const&, TER, beast::Journal const& j)
 
 void
 NoBadOffers::visitEntry(
+    uint256 const&,
+    bool isDelete,
+    std::shared_ptr <SLE const> const& before,
+    std::shared_ptr <SLE const> const& after)
+{
+    auto isBad = [](STAmount const& pays, STAmount const& gets)
+    {
+        // An offer should never be negative
+        if (pays < beast::zero)
+            return true;
+
+        if (gets < beast::zero)
+            return true;
+
+        // Can't have an CSC to CSC offer:
+        return pays.native() && gets.native();
+    };
+
+    if(before && before->getType() == ltOFFER)
+        bad_ |= isBad ((*before)[sfTakerPays], (*before)[sfTakerGets]);
+
+    if(after && after->getType() == ltOFFER)
+        bad_ |= isBad((*after)[sfTakerPays], (*after)[sfTakerGets]);
+}
+
+void
+NoBadOffers::visitEntryInjection(
     uint256 const&,
     bool isDelete,
     std::shared_ptr <SLE const> const& before,
@@ -221,6 +335,34 @@ NoZeroEscrow::visitEntry(
         bad_ |= isBad((*after)[sfAmount]);
 }
 
+void
+NoZeroEscrow::visitEntryInjection(
+    uint256 const&,
+    bool isDelete,
+    std::shared_ptr <SLE const> const& before,
+    std::shared_ptr <SLE const> const& after)
+{
+    auto isBad = [](STAmount const& amount)
+    {
+        if (!amount.native())
+            return true;
+
+        if (amount.csc().drops() <= 0)
+            return true;
+
+        if (amount.csc().drops() >= SYSTEM_CURRENCY_INJECTION)
+            return true;
+
+        return false;
+    };
+
+    if(before && before->getType() == ltESCROW)
+        bad_ |= isBad((*before)[sfAmount]);
+
+    if(after && after->getType() == ltESCROW)
+        bad_ |= isBad((*after)[sfAmount]);
+}
+
 bool
 NoZeroEscrow::finalize(STTx const& tx, TER, beast::Journal const& j)
 {
@@ -237,6 +379,17 @@ NoZeroEscrow::finalize(STTx const& tx, TER, beast::Journal const& j)
 
 void
 AccountRootsNotDeleted::visitEntry(
+    uint256 const&,
+    bool isDelete,
+    std::shared_ptr <SLE const> const& before,
+    std::shared_ptr <SLE const> const&)
+{
+    if (isDelete && before && before->getType() == ltACCOUNT_ROOT)
+        accountDeleted_ = true;
+}
+
+void
+AccountRootsNotDeleted::visitEntryInjection(
     uint256 const&,
     bool isDelete,
     std::shared_ptr <SLE const> const& before,
@@ -293,6 +446,41 @@ LedgerEntryTypesMatch::visitEntry(
     }
 }
 
+void
+LedgerEntryTypesMatch::visitEntryInjection(
+    uint256 const&,
+    bool,
+    std::shared_ptr <SLE const> const& before,
+    std::shared_ptr <SLE const> const& after)
+{
+    if (before && after && before->getType() != after->getType())
+        typeMismatch_ = true;
+
+    if (after)
+    {
+        switch (after->getType())
+        {
+        case ltACCOUNT_ROOT:
+        case ltDIR_NODE:
+        case ltCASINOCOIN_STATE:
+        case ltTICKET:
+        case ltSIGNER_LIST:
+        case ltOFFER:
+        case ltLEDGER_HASHES:
+        case ltAMENDMENTS:
+        case ltCONFIGURATION:
+        case ltFEE_SETTINGS:
+        case ltCRN_ROUND:
+        case ltESCROW:
+        case ltPAYCHAN:
+            break;
+        default:
+            invalidTypeAdded_ = true;
+            break;
+        }
+    }
+}
+
 bool
 LedgerEntryTypesMatch::finalize(STTx const&, TER, beast::Journal const& j)
 {
@@ -316,6 +504,24 @@ LedgerEntryTypesMatch::finalize(STTx const&, TER, beast::Journal const& j)
 
 void
 NoCSCTrustLines::visitEntry(
+    uint256 const&,
+    bool,
+    std::shared_ptr <SLE const> const&,
+    std::shared_ptr <SLE const> const& after)
+{
+    if (after && after->getType() == ltCASINOCOIN_STATE)
+    {
+        // checking the issue directly here instead of
+        // relying on .native() just in case native somehow
+        // were systematically incorrect
+        cscTrustLine_ =
+            after->getFieldAmount (sfLowLimit).issue() == cscIssue() ||
+            after->getFieldAmount (sfHighLimit).issue() == cscIssue();
+    }
+}
+
+void
+NoCSCTrustLines::visitEntryInjection(
     uint256 const&,
     bool,
     std::shared_ptr <SLE const> const&,

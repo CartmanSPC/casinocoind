@@ -65,6 +65,21 @@ public:
         std::shared_ptr<SLE const> const& after);
 
     /**
+     * @brief called for each ledger entry in the current transaction created after the coin injection.
+     *
+     * @param index the key (identifier) for the ledger entry
+     * @param isDelete true if the SLE is being deleted
+     * @param before ledger entry before modification by the transaction
+     * @param after ledger entry after modification by the transaction
+     */
+    void
+    visitEntryInjection(
+        uint256 const& index,
+        bool isDelete,
+        std::shared_ptr<SLE const> const& before,
+        std::shared_ptr<SLE const> const& after);
+
+    /**
      * @brief called after all ledger entries have been visited to determine
      * the final status of the check
      *
@@ -111,6 +126,13 @@ public:
         std::shared_ptr<SLE const> const&,
         std::shared_ptr<SLE const> const&);
 
+    void
+    visitEntryInjection(
+        uint256 const&,
+        bool,
+        std::shared_ptr<SLE const> const&,
+        std::shared_ptr<SLE const> const&);
+
     bool
     finalize(STTx const&, TER, beast::Journal const&);
 };
@@ -133,6 +155,13 @@ public:
         std::shared_ptr<SLE const> const&,
         std::shared_ptr<SLE const> const&);
 
+    void
+    visitEntryInjection(
+        uint256 const&,
+        bool,
+        std::shared_ptr<SLE const> const&,
+        std::shared_ptr<SLE const> const&);
+
     bool
     finalize(STTx const&, TER, beast::Journal const&);
 };
@@ -148,6 +177,13 @@ class CSCBalanceChecks
 public:
     void
     visitEntry(
+        uint256 const&,
+        bool,
+        std::shared_ptr<SLE const> const&,
+        std::shared_ptr<SLE const> const&);
+
+    void
+    visitEntryInjection(
         uint256 const&,
         bool,
         std::shared_ptr<SLE const> const&,
@@ -174,6 +210,13 @@ public:
         bool,
         std::shared_ptr<SLE const> const&,
         std::shared_ptr<SLE const> const&);
+    
+    void
+    visitEntryInjection(
+        uint256 const&,
+        bool,
+        std::shared_ptr<SLE const> const&,
+        std::shared_ptr<SLE const> const&);
 
     bool
     finalize(STTx const&, TER, beast::Journal const&);
@@ -190,6 +233,13 @@ public:
 
     void
     visitEntry(
+        uint256 const&,
+        bool,
+        std::shared_ptr<SLE const> const&,
+        std::shared_ptr<SLE const> const&);
+
+    void
+    visitEntryInjection(
         uint256 const&,
         bool,
         std::shared_ptr<SLE const> const&,
@@ -215,6 +265,13 @@ public:
         bool,
         std::shared_ptr<SLE const> const&,
         std::shared_ptr<SLE const> const&);
+    
+    void
+    visitEntryInjection(
+        uint256 const&,
+        bool,
+        std::shared_ptr<SLE const> const&,
+        std::shared_ptr<SLE const> const&);
 
     bool
     finalize(STTx const&, TER, beast::Journal const&);
@@ -233,6 +290,13 @@ public:
 
     void
     visitEntry(
+        uint256 const&,
+        bool,
+        std::shared_ptr<SLE const> const&,
+        std::shared_ptr<SLE const> const&);
+    
+    void
+    visitEntryInjection(
         uint256 const&,
         bool,
         std::shared_ptr<SLE const> const&,

@@ -242,6 +242,10 @@ Change::applyAmendment()
         amendmentObject->setFieldV256 (sfAmendments, amendments);
 
         ctx_.app.getAmendmentTable ().enable (amendment);
+        if (amendment == feature("CoinInjection"))
+        {
+            JLOG (j_.info()) << "CoinInjection amendment got enabled !!! -->>> Execute Coin Injection.";
+        }
 
         if (!ctx_.app.getAmendmentTable ().isSupported (amendment))
         {

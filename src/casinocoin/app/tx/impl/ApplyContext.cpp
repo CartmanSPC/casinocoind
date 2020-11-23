@@ -86,7 +86,25 @@ ApplyContext::checkInvariantsHelper(TER terResult, std::index_sequence<Is...>)
         auto checkers = getInvariantChecks();
 
         // call each check's per-entry method
+        if (view_->rules().enabled(featureCoinInjection))
+        {
         visit (
+            [&checkers](
+                uint256 const& index,
+                bool isDelete,
+                std::shared_ptr <SLE const> const& before,
+                std::shared_ptr <SLE const> const& after)
+            {
+                // Sean Parent for_each_argument trick
+                (void)std::array<int, sizeof...(Is)>{
+                    {((std::get<Is>(checkers).
+                            visitEntryInjection(index, isDelete, before, after)), 0)...}
+                };
+            });
+        }
+        else
+        {
+            visit (
             [&checkers](
                 uint256 const& index,
                 bool isDelete,
@@ -99,6 +117,7 @@ ApplyContext::checkInvariantsHelper(TER terResult, std::index_sequence<Is...>)
                             visitEntry(index, isDelete, before, after)), 0)...}
                 };
             });
+        }
 
         // Sean Parent for_each_argument trick
         // (a fold expression with `&&` would be really nice here when we move

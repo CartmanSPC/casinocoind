@@ -207,11 +207,19 @@ void CRNRoundImpl::doValidation(std::shared_ptr<const ReadView> const& lastClose
         JLOG(j_.info()) << "CRNRoundImpl::doValidation CRN Rounds are de-activated. aborting";
         return;
     }
-    CSCAmount totalCoinsSupply(SYSTEM_CURRENCY_START);
+    CSCAmount totalCoinsSupply;
+    if (lastClosedLedger->rules().enabled(featureCoinInjection))
+    {
+        totalCoinsSupply = CSCAmount(SYSTEM_CURRENCY_INJECTION);
+    }
+    else
+    {
+        totalCoinsSupply = CSCAmount(SYSTEM_CURRENCY_START);
+    }
 
     if (lastClosedLedger->info().drops > totalCoinsSupply)
     {
-        JLOG(j_.warn()) << "CRNRoundImpl::doValidation. more drops in LCL then SYSTEM_CURRENCY_START.";
+        JLOG(j_.warn()) << "CRNRoundImpl::doValidation. more drops in LCL then Total Coin Supply.";
         JLOG(j_.warn()) << "CRNRoundImpl::doValidation. drops in LCL: " << static_cast<uint64_t>(lastClosedLedger->info().drops.drops());
         return;
     }
@@ -252,12 +260,20 @@ void CRNRoundImpl::doVoting(std::shared_ptr<const ReadView> const& lastClosedLed
         JLOG(j_.info()) << "CRNRoundImpl::doVoting CRN Rounds are de-activated. aborting";
         return;
     }
-    CSCAmount totalCoinsSupply(SYSTEM_CURRENCY_START);
+    CSCAmount totalCoinsSupply;
+    if (lastClosedLedger->rules().enabled(featureCoinInjection))
+    {
+        totalCoinsSupply = CSCAmount(SYSTEM_CURRENCY_INJECTION);
+    }
+    else
+    {
+        totalCoinsSupply = CSCAmount(SYSTEM_CURRENCY_START);
+    }
     // jrojek: once we figure out the way to trace burn account two tx on ledger, we should substract it here
     CSCAmount totalCoinsInCirculation(totalCoinsSupply);
     if (lastClosedLedger->info().drops > totalCoinsSupply)
     {
-        JLOG(j_.warn()) << "CRNRoundImpl::doValidation. more drops in LCL then SYSTEM_CURRENCY_START.";
+        JLOG(j_.warn()) << "CRNRoundImpl::doValidation. more drops in LCL then Total Coin Supply.";
         JLOG(j_.warn()) << "CRNRoundImpl::doValidation. drops in LCL: " << static_cast<uint64_t>(lastClosedLedger->info().drops.drops());
         return;
     }
@@ -425,13 +441,20 @@ void CRNRoundImpl::updatePosition(std::list<STPerformanceReport::pointer> const&
         JLOG(j_.info()) << "CRNRoundImpl::updatePosition CRN Rounds are de-activated. aborting";
         return;
     }
-
-    CSCAmount totalCoinsSupply(SYSTEM_CURRENCY_START);
+    CSCAmount totalCoinsSupply;
+    if (closedLedger->rules().enabled(featureCoinInjection))
+    {
+        totalCoinsSupply = CSCAmount(SYSTEM_CURRENCY_INJECTION);
+    }
+    else
+    {
+        totalCoinsSupply = CSCAmount(SYSTEM_CURRENCY_START);
+    }
     // jrojek: once we figure out the way to trace burn account two tx on ledger, we should substract it here
     CSCAmount totalCoinsInCirculation(totalCoinsSupply);
     if (closedLedger->info().drops > totalCoinsSupply)
     {
-        JLOG(j_.warn()) << "CRNRoundImpl::updatePosition. more drops in LCL then SYSTEM_CURRENCY_START.";
+        JLOG(j_.warn()) << "CRNRoundImpl::updatePosition. more drops in LCL then Total Coin Supply.";
         JLOG(j_.warn()) << "CRNRoundImpl::updatePosition. drops in LCL: " << static_cast<uint64_t>(closedLedger->info().drops.drops());
         return;
     }

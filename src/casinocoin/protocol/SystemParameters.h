@@ -62,6 +62,11 @@ static
 std::uint64_t const
 SYSTEM_CURRENCY_START = SYSTEM_CURRENCY_GIFT * SYSTEM_CURRENCY_USERS * SYSTEM_CURRENCY_PARTS;
 
+/** New Coin Injection Amount */
+static
+std::uint64_t const
+SYSTEM_CURRENCY_INJECTION = 65000000 * SYSTEM_CURRENCY_GIFT * SYSTEM_CURRENCY_PARTS;
+
 /* The currency code for the native currency. */
 static inline
 std::string const&
