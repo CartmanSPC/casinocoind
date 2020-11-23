@@ -245,6 +245,19 @@ Change::applyAmendment()
         if (amendment == feature("CoinInjection"))
         {
             JLOG (j_.info()) << "CoinInjection amendment got enabled !!! -->>> Execute Coin Injection.";
+            // coin injection got approved in this ledger so generate new coins !
+            std::uint64_t injectionDrops = SYSTEM_CURRENCY_INJECTION - SYSTEM_CURRENCY_START;
+            CSCAmount injectionDropsCSCAmount(injectionDrops);
+            // get genesis account
+            static auto const dstAccountID = calcAccountID(generateKeyPair(KeyType::secp256k1, generateSeed("masterpassphrase")).first);
+            auto const keyletDstAccount = keylet::account(dstAccountID);
+            SLE::pointer sleDst = view().peek (keyletDstAccount);
+            // update the genesis account with the injection drops
+            view().update (sleDst);
+            sleDst->setFieldAmount(sfBalance, sleDst->getFieldAmount(sfBalance) + injectionDropsCSCAmount);
+            // increase the total coin supply in the ledger
+            ctx_.redistributeCSC(injectionDropsCSCAmount);
+            JLOG (j_.info()) << "CoinInjection distributed " << injectionDrops " drops to account " << dstAccountID;
         }
 
         if (!ctx_.app.getAmendmentTable ().isSupported (amendment))
