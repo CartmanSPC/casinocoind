@@ -75,7 +75,7 @@ public:
     static const std::uint64_t cMaxNative  = 9000000000000000000ull;
 
     // Max native value on network.
-    static const std::uint64_t cMaxNativeN = 4000000000000000000ull;
+    static const std::uint64_t cMaxNativeN = 6500000000000000000ull;
     static const std::uint64_t cNotNative  = 0x8000000000000000ull;
     static const std::uint64_t cPosNative  = 0x4000000000000000ull;
 

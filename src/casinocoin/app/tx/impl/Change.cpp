@@ -253,7 +253,10 @@ Change::applyAmendment()
             auto const keyletDstAccount = keylet::account(dstAccountID);
             SLE::pointer sleDst = view().peek (keyletDstAccount);
             // update the genesis account with the injection drops
-            sleDst->setFieldAmount(sfBalance, sleDst->getFieldAmount(sfBalance) + injectionDrops);
+            auto const balance = sleDst->getFieldAmount(sfBalance).csc();
+            auto const newBalance = balance + injectionDropsCSCAmount;
+            JLOG (j_.info()) << "CoinInjection balance: " << balance.drops() << " newBalance: " << newBalance.drops();
+            sleDst->setFieldAmount(sfBalance, newBalance.drops());
             // Re-arm the password change fee if we can and need to.
             if ((sleDst->getFlags () & lsfPasswordSpent))
                 sleDst->clearFlag (lsfPasswordSpent);
