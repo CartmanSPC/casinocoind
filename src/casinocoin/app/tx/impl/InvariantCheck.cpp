@@ -149,6 +149,11 @@ CSCNotCreated::finalize(STTx const& tx, TER /*tec*/, beast::Journal const& j)
                        << " amount of CSC burned: " << burnedAmount;
         drops_ += burnedAmount;
     }
+
+    // coin creation is allowed during amendment changes
+    if (tx.getTxnType() == ttAMENDMENT)
+        return true;
+
     if(-1*fee <= drops_ && drops_ <= 0)
         return true;
 
@@ -226,8 +231,12 @@ CSCBalanceChecks::visitEntryInjection(
 }
 
 bool
-CSCBalanceChecks::finalize(STTx const&, TER, beast::Journal const& j)
+CSCBalanceChecks::finalize(STTx const& tx, TER, beast::Journal const& j)
 {
+    // balance change might be bad during amendment changes due to coin injection
+    if (tx.getTxnType() == ttAMENDMENT)
+        return true;
+
     if (bad_)
     {
         JLOG(j.fatal()) << "Invariant failed: incorrect account CSC balance";
