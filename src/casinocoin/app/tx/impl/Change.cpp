@@ -253,8 +253,11 @@ Change::applyAmendment()
             auto const keyletDstAccount = keylet::account(dstAccountID);
             SLE::pointer sleDst = view().peek (keyletDstAccount);
             // update the genesis account with the injection drops
+            sleDst->setFieldAmount(sfBalance, sleDst->getFieldAmount(sfBalance) + injectionDrops);
+            // Re-arm the password change fee if we can and need to.
+            if ((sleDst->getFlags () & lsfPasswordSpent))
+                sleDst->clearFlag (lsfPasswordSpent);
             view().update (sleDst);
-            sleDst->setFieldAmount(sfBalance, sleDst->getFieldAmount(sfBalance) + injectionDropsCSCAmount);
             // increase the total coin supply in the ledger
             ctx_.redistributeCSC(injectionDropsCSCAmount);
             JLOG (j_.info()) << "CoinInjection distributed " << injectionDrops << " drops to account " << dstAccountID;
