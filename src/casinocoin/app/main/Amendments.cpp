@@ -37,6 +37,7 @@ preEnabledAmendments ()
 {
     return
     {
+       // { "2266C04CE2573A5C7DA9521DA6542060FE54E88AC72D2F3B9FE33F39EB84C0E9 CoinInjection" }
     };
 }
 

@@ -84,13 +84,17 @@ STAmount::STAmount(SerialIter& sit, SField const& name)
     : STBase(name)
 {
     std::uint64_t value = sit.get64 ();
-
+    std::cout << "STAmount value: " << value << " name: " << name.getName() << std::endl;
+    std::cout << "STAmount native cNotNative: " << (value & cNotNative) << std::endl;
     // native
     if ((value & cNotNative) == 0)
     {
+        std::cout << "STAmount native" << std::endl;
+        std::cout << "STAmount native positive cPosNative: " << (value & cPosNative) << std::endl;
         // positive
         if ((value & cPosNative) != 0)
         {
+            std::cout << "STAmount native positive" << std::endl;
             mValue = value & ~cPosNative;
             mOffset = 0;
             mIsNative = true;
@@ -109,6 +113,7 @@ STAmount::STAmount(SerialIter& sit, SField const& name)
         return;
     }
 
+    std::cout << "STAmount not native: " << (value & cNotNative) << std::endl;
     Issue issue;
     issue.currency.copyFrom (sit.get160 ());
 
