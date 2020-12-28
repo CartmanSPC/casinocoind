@@ -55,6 +55,7 @@ public:
     using mantissa_type = std::uint64_t;
     using exponent_type = int;
     using rep = std::pair <mantissa_type, exponent_type>;
+    using mantissa_128_type = boost::multiprecision::uint128_t;
 
 private:
     Issue mIssue;
@@ -62,6 +63,8 @@ private:
     exponent_type mOffset;
     bool mIsNative;      // A shorthand for isCSC(mIssue).
     bool mIsNegative;
+    mantissa_128_type mValueOverflow;
+    bool mIsOverflowValue;
 
 public:
     using value_type = STAmount;
@@ -79,6 +82,9 @@ public:
     static const std::uint64_t cNotNative  = 0x8000000000000000ull;
     static const std::uint64_t cPosNative  = 0x4000000000000000ull;
 
+    static boost::multiprecision::uint128_t constexpr cNotNativeOverflow = 0xF000000000000000ull;
+    static boost::multiprecision::uint128_t constexpr cPosNativeOverflow = 0x8000000000000000ull;
+    
     static std::uint64_t const uRateOne;
 
     //--------------------------------------------------------------------------
@@ -101,6 +107,8 @@ public:
             bool native, bool negative);
 
     STAmount (SField const& name, std::int64_t mantissa);
+
+    STAmount (SField const& name, boost::multiprecision::uint128_t mantissa_128);
 
     STAmount (SField const& name,
         std::uint64_t mantissa = 0, bool negative = false);
@@ -145,6 +153,8 @@ private:
     construct (SerialIter&, SField const& name);
 
     void set (std::int64_t v);
+    void set_128 (boost::multiprecision::uint128_t v);
+
     void canonicalize();
 
 public:
@@ -157,7 +167,9 @@ public:
     int exponent() const noexcept { return mOffset; }
     bool native() const noexcept { return mIsNative; }
     bool negative() const noexcept { return mIsNegative; }
+    bool overflow() const noexcept { return mIsOverflowValue; }
     std::uint64_t mantissa() const noexcept { return mValue; }
+    boost::multiprecision::uint128_t mantissa_128() const noexcept { return mValueOverflow; }
     Issue const& issue() const { return mIssue; }
 
     // These three are deprecated

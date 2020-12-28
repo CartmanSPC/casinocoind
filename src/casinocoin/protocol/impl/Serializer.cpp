@@ -85,6 +85,28 @@ int Serializer::add128 (const uint128& i)
     return ret;
 }
 
+int Serializer::add128boost (boost::multiprecision::uint128_t i)
+{
+    int ret = mData.size ();
+    mData.push_back (static_cast<unsigned char> (i >> 120));
+    mData.push_back (static_cast<unsigned char> ((i >> 112) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 104) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 96) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 88) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 80) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 72) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 64) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 56) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 48) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 40) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 32) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 24) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 16) & 0xff));
+    mData.push_back (static_cast<unsigned char> ((i >> 8) & 0xff));
+    mData.push_back (static_cast<unsigned char> (i & 0xff));
+    return ret;
+}
+
 int Serializer::add256 (uint256 const& i)
 {
     int ret = mData.size ();
@@ -485,6 +507,35 @@ SerialIter::get64 ()
         (std::uint64_t(t[5]) << 16) +
         (std::uint64_t(t[6]) <<  8) +
          std::uint64_t(t[7] );
+}
+
+boost::multiprecision::uint128_t
+SerialIter::get128boost ()
+{
+    if (remain_ < 8)
+        Throw<std::runtime_error> (
+            "invalid SerialIter get128boost");
+    auto t = p_;
+    p_ += 16;
+    used_ += 16;
+    remain_ -= 16;
+    return
+        (boost::multiprecision::uint128_t(t[0]) << 120) +
+        (boost::multiprecision::uint128_t(t[1]) << 112) +
+        (boost::multiprecision::uint128_t(t[2]) << 104) +
+        (boost::multiprecision::uint128_t(t[3]) << 96) +
+        (boost::multiprecision::uint128_t(t[4]) << 88) +
+        (boost::multiprecision::uint128_t(t[5]) << 80) +
+        (boost::multiprecision::uint128_t(t[6]) << 72) +
+        (boost::multiprecision::uint128_t(t[7]) << 64) +
+        (boost::multiprecision::uint128_t(t[8]) << 56) +
+        (boost::multiprecision::uint128_t(t[9]) << 48) +
+        (boost::multiprecision::uint128_t(t[10]) << 40) +
+        (boost::multiprecision::uint128_t(t[11]) << 32) +
+        (boost::multiprecision::uint128_t(t[12]) << 24) +
+        (boost::multiprecision::uint128_t(t[13]) << 16) +
+        (boost::multiprecision::uint128_t(t[14]) <<  8) +
+         boost::multiprecision::uint128_t(t[15] );
 }
 
 void

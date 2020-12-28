@@ -204,7 +204,7 @@ Ledger::Ledger (
     , rules_{config.features}
 {
     info_.seq = 1;
-    info_.drops = SYSTEM_CURRENCY_START;
+    info_.drops = SYSTEM_CURRENCY_INJECTION;
     info_.closeTimeResolution = ledgerDefaultTimeResolution;
 
     static auto const id = calcAccountID(

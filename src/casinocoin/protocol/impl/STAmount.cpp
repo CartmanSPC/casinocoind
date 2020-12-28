@@ -73,6 +73,23 @@ getSNValue (STAmount const& amount)
 }
 
 static
+boost::multiprecision::uint128_t
+getSNValueOverflow (STAmount const& amount)
+{
+    if (!amount.native ())
+        Throw<std::runtime_error> ("amount is not native!");
+
+    auto ret = static_cast<boost::multiprecision::uint128_t>(amount.mantissa_128 ());
+
+    assert (static_cast<boost::multiprecision::uint128_t>(ret) == amount.mantissa_128 ());
+
+    if (amount.negative ())
+        ret = 0 - ret;
+
+    return ret;
+}
+
+static
 bool
 areComparable (STAmount const& v1, STAmount const& v2)
 {
@@ -83,37 +100,87 @@ areComparable (STAmount const& v1, STAmount const& v2)
 STAmount::STAmount(SerialIter& sit, SField const& name)
     : STBase(name)
 {
-    std::uint64_t value = sit.get64 ();
-    std::cout << "STAmount value: " << value << " name: " << name.getName() << std::endl;
-    std::cout << "STAmount native cNotNative: " << (value & cNotNative) << std::endl;
-    // native
-    if ((value & cNotNative) == 0)
+    std::cout << "STAmount size: " << sit.getBytesLeft() << " mValue: " << mValue << " mValueOverflow: " << mValueOverflow << " name: " << name.getName() << std::endl;
+    std::uint64_t value;
+    boost::multiprecision::uint128_t valueOverflow;
+    bool overflow = false;
+    if (sit.getBytesLeft() == 38)
     {
-        std::cout << "STAmount native" << std::endl;
-        std::cout << "STAmount native positive cPosNative: " << (value & cPosNative) << std::endl;
-        // positive
-        if ((value & cPosNative) != 0)
-        {
-            std::cout << "STAmount native positive" << std::endl;
-            mValue = value & ~cPosNative;
+        valueOverflow = sit.get128boost();
+        overflow = true;
+        // std::cout << "STAmount overflow value: " << valueOverflow << " name: " << name.getName() << " bytes left: " << sit.getBytesLeft() << std::endl;
+    }
+    else
+    {
+        value = sit.get64 ();
+        // std::cout << "STAmount value: " << value << " name: " << name.getName()  << " bytes left: " << sit.getBytesLeft() << std::endl;
+    }
+    
+    if (overflow)
+    {
+        // std::cout << "STAmount native cNotNativeOverflow: " << (valueOverflow & cNotNative) << std::endl;
+        // native
+        // if ((valueOverflow & cNotNative) == 0)
+        // {
+            // std::cout << "STAmount native positive cPosNativeOverflow: " << (valueOverflow & cPosNativeOverflow) << std::endl;
+            // positive
+            if ((valueOverflow & cPosNativeOverflow) != 0)
+            {
+                mValueOverflow = valueOverflow & ~cPosNativeOverflow;
+                mIsOverflowValue = true;
+                // std::cout << "STAmount native positive: " << mValueOverflow << std::endl;
+                mOffset = 0;
+                mIsNative = true;
+                mIsNegative = false;
+                return;
+            }
+
+            // negative
+            if (valueOverflow == 0)
+                Throw<std::runtime_error> ("negative zero is not canonical");
+
+            mValueOverflow = valueOverflow;
+            mIsOverflowValue = true;
             mOffset = 0;
             mIsNative = true;
-            mIsNegative = false;
+            mIsNegative = true;
+            return;
+        // }
+
+        // std::cout << "STAmount not native overflow: " << (valueOverflow & cNotNativeOverflow) << std::endl;
+    }
+    else
+    {
+        // std::cout << "STAmount native cNotNative: " << (value & cNotNative) << std::endl;
+        // native
+        if ((value & cNotNative) == 0)
+        {
+            // std::cout << "STAmount native" << std::endl;
+            // std::cout << "STAmount native positive cPosNative: " << (value & cPosNative) << std::endl;
+            // positive
+            if ((value & cPosNative) != 0)
+            {
+                mValue = value & ~cPosNative;
+                // std::cout << "STAmount native positive: " << mValue << std::endl;
+                mOffset = 0;
+                mIsNative = true;
+                mIsNegative = false;
+                mIsOverflowValue = false;
+                return;
+            }
+
+            // negative
+            if (value == 0)
+                Throw<std::runtime_error> ("negative zero is not canonical");
+
+            mValue = value;
+            mOffset = 0;
+            mIsNative = true;
+            mIsNegative = true;
+            mIsOverflowValue = false;
             return;
         }
-
-        // negative
-        if (value == 0)
-            Throw<std::runtime_error> ("negative zero is not canonical");
-
-        mValue = value;
-        mOffset = 0;
-        mIsNative = true;
-        mIsNegative = true;
-        return;
     }
-
-    std::cout << "STAmount not native: " << (value & cNotNative) << std::endl;
     Issue issue;
     issue.currency.copyFrom (sit.get160 ());
 
@@ -170,7 +237,9 @@ STAmount::STAmount (SField const& name, Issue const& issue,
     , mOffset (exponent)
     , mIsNative (native)
     , mIsNegative (negative)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount Issue 1 native: " << mIsNative << " name: " << name.getName() << std::endl;
 }
 
 STAmount::STAmount (Issue const& issue,
@@ -181,7 +250,9 @@ STAmount::STAmount (Issue const& issue,
     , mOffset (exponent)
     , mIsNative (native)
     , mIsNegative (negative)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount Issue 2 native: " << mIsNative << std::endl;
 }
 
 
@@ -194,7 +265,9 @@ STAmount::STAmount (SField const& name, Issue const& issue,
     , mOffset (exponent)
     , mIsNative (native)
     , mIsNegative (negative)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount Issue 3 native: " << mIsNative << " name: " << name.getName() << std::endl;
     canonicalize();
 }
 
@@ -202,8 +275,20 @@ STAmount::STAmount (SField const& name, std::int64_t mantissa)
     : STBase (name)
     , mOffset (0)
     , mIsNative (true)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount 1 native: " << mIsNative << " name: " << name.getName() << " value: " << mantissa << std::endl;
     set (mantissa);
+}
+
+STAmount::STAmount (SField const& name, boost::multiprecision::uint128_t mantissa_128)
+    : STBase (name)
+    , mOffset (0)
+    , mIsNative (true)
+    , mIsOverflowValue (true)
+{
+    // std::cout << "STAmount 1 overflow native: " << mIsNative << " name: " << name.getName() << " value: " << mantissa_128 << std::endl;
+    set_128 (mantissa_128);
 }
 
 STAmount::STAmount (SField const& name,
@@ -213,7 +298,9 @@ STAmount::STAmount (SField const& name,
     , mOffset (0)
     , mIsNative (true)
     , mIsNegative (negative)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount 2 native: " << mIsNative << " name: " << name.getName() << " value: " << mantissa << std::endl;
 }
 
 STAmount::STAmount (SField const& name, Issue const& issue,
@@ -223,7 +310,9 @@ STAmount::STAmount (SField const& name, Issue const& issue,
     , mValue (mantissa)
     , mOffset (exponent)
     , mIsNegative (negative)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount Issue 4 native: " << mIsNative << " name: " << name.getName() << " value: " << mantissa << std::endl;
     canonicalize ();
 }
 
@@ -234,7 +323,9 @@ STAmount::STAmount (std::uint64_t mantissa, bool negative)
     , mOffset (0)
     , mIsNative (true)
     , mIsNegative (mantissa != 0 && negative)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount 3 native: " << mIsNative << " value: " << mantissa << std::endl;
 }
 
 STAmount::STAmount (Issue const& issue,
@@ -243,7 +334,9 @@ STAmount::STAmount (Issue const& issue,
     , mValue (mantissa)
     , mOffset (exponent)
     , mIsNegative (negative)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount Issue 5 native: " << mIsNative << " value: " << mantissa << std::endl;
     canonicalize ();
 }
 
@@ -251,7 +344,9 @@ STAmount::STAmount (Issue const& issue,
         std::int64_t mantissa, int exponent)
     : mIssue (issue)
     , mOffset (exponent)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount Issue 6 native: " << mIsNative << " value: " << mantissa << std::endl;
     set (mantissa);
     canonicalize ();
 }
@@ -260,12 +355,16 @@ STAmount::STAmount (Issue const& issue,
         std::uint32_t mantissa, int exponent, bool negative)
     : STAmount (issue, static_cast<std::uint64_t>(mantissa), exponent, negative)
 {
+    // std::cout << "STAmount Issue 6 native: " << mIsNative << " value: " << mantissa << std::endl;
+    mIsOverflowValue = false;
 }
 
 STAmount::STAmount (Issue const& issue,
         int mantissa, int exponent)
     : STAmount (issue, static_cast<std::int64_t>(mantissa), exponent)
 {
+    // std::cout << "STAmount Issue 7 native: " << mIsNative << " value: " << mantissa << std::endl;
+    mIsOverflowValue = false;
 }
 
 // Legacy support for new-style amounts
@@ -274,7 +373,9 @@ STAmount::STAmount (IOUAmount const& amount, Issue const& issue)
     , mOffset (amount.exponent ())
     , mIsNative (false)
     , mIsNegative (amount < zero)
+    , mIsOverflowValue (false)
 {
+    // std::cout << "STAmount IOUAmount native: " << mIsNative << " value: " << amount.mantissa() << std::endl;
     if (mIsNegative)
         mValue = static_cast<std::uint64_t> (-amount.mantissa ());
     else
@@ -288,10 +389,23 @@ STAmount::STAmount (CSCAmount const& amount)
     , mIsNative (true)
     , mIsNegative (amount < zero)
 {
-    if (mIsNegative)
-        mValue = static_cast<std::uint64_t> (-amount.drops ());
+    // std::cout << "STAmount CSCAmount native: " << mIsNative << " negative: " << mIsNegative << " value: " << amount.drops() << std::endl;
+    if (amount.drops() > cPosNative)
+    {
+        mIsOverflowValue = true;
+        if (mIsNegative)
+            mValueOverflow = static_cast<boost::multiprecision::uint128_t> (-amount.drops ());
+        else
+            mValueOverflow = static_cast<boost::multiprecision::uint128_t> (amount.drops ());
+    }
     else
-        mValue = static_cast<std::uint64_t> (amount.drops ());
+    {
+        mIsOverflowValue = false;
+        if (mIsNegative)
+            mValue = static_cast<std::uint64_t> (-amount.drops ());
+        else
+            mValue = static_cast<std::uint64_t> (amount.drops ());
+    }
 
     canonicalize ();
 }
@@ -312,8 +426,17 @@ CSCAmount STAmount::csc () const
     if (!mIsNative)
         Throw<std::logic_error> ("Cannot return non-native STAmount as CSCAmount");
 
-    auto drops = static_cast<std::int64_t> (mValue);
+    std::cout << "STAmount csc() value: " << mValue << " overflow value: " << mValueOverflow << " isOverFlow?: " << mIsOverflowValue << std::endl;
+    if (mIsOverflowValue)
+    {
+        auto drops = static_cast<std::int64_t> (mValueOverflow);
+        if (mIsNegative)
+            drops = -drops;
 
+        return { drops };
+    }
+
+    auto drops = static_cast<std::int64_t> (mValue);
     if (mIsNegative)
         drops = -drops;
 
@@ -354,6 +477,8 @@ STAmount& STAmount::operator-= (STAmount const& a)
 
 STAmount operator+ (STAmount const& v1, STAmount const& v2)
 {
+    // std::cout << "STAmount operator+ overflow 1: " << v1.overflow() << " overflow 2: " << v2.overflow() << std::endl;
+    // std::cout << "STAmount operator+ field 1: " << v1.getFName().getName() << " field 2: " << v2.getFName().getName() << std::endl;
     if (!areComparable (v1, v2))
         Throw<std::runtime_error> ("Can't add amounts that are't comparable!");
 
@@ -366,6 +491,9 @@ STAmount operator+ (STAmount const& v1, STAmount const& v2)
         return { v1.getFName (), v1.issue (),
             v2.mantissa (), v2.exponent (), v2.negative () };
     }
+
+    if (v1.native () && v1.overflow ())
+        return { v1.getFName (), getSNValueOverflow (v1) + getSNValue (v2) };
 
     if (v1.native ())
         return { v1.getFName (), getSNValue (v1) + getSNValue (v2) };
@@ -505,9 +633,19 @@ STAmount::getFullText () const
 std::string
 STAmount::getText () const
 {
+    // std::cout << "STAmount getText() value: " << mValue << " overflow value: " << mValueOverflow << std::endl;
     // keep full internal accuracy, but make more human friendly if posible
-    if (*this == zero)
+    if (*this == zero && !mIsOverflowValue)
         return "0";
+
+    if (mIsOverflowValue)
+    {
+        std::string retOverflow;
+        if (mIsNegative)
+            retOverflow.append (1, '-');
+        retOverflow.append (mValueOverflow.str());
+        return retOverflow;
+    }
 
     std::string const raw_value (std::to_string (mValue));
     std::string ret;
@@ -603,14 +741,31 @@ STAmount::getJson (int) const
 void
 STAmount::add (Serializer& s) const
 {
+    // std::cout << "STAmount Add - native: " << mIsNative << " offset: " << mOffset << " overflow: " << mIsOverflowValue << std::endl;
     if (mIsNative)
     {
         assert (mOffset == 0);
-
-        if (!mIsNegative)
-            s.add64 (mValue | cPosNative);
+        // if overflowed then use uint128
+        if (mIsOverflowValue)
+        {
+            if (!mIsNegative)
+            {
+                auto res = mValueOverflow | cPosNativeOverflow;
+                s.add128boost (res);
+            }
+            else
+                s.add128boost (mValueOverflow);
+        }
         else
-            s.add64 (mValue);
+        {
+            if (!mIsNegative)
+            {
+                auto res = mValue | cPosNative;
+                s.add64 (res);
+            }
+            else
+                s.add64 (mValue);   
+        }
     }
     else
     {
@@ -648,7 +803,7 @@ void STAmount::canonicalize ()
         // native currency amounts should always have an offset of zero
         mIsNative = true;
 
-        if (mValue == 0)
+        if (mValue == 0 || mValueOverflow == 0)
         {
             mOffset = 0;
             mIsNegative = false;
@@ -719,11 +874,29 @@ void STAmount::set (std::int64_t v)
     {
         mIsNegative = true;
         mValue = static_cast<std::uint64_t>(-v);
+        mIsOverflowValue = false;
     }
     else
     {
         mIsNegative = false;
         mValue = static_cast<std::uint64_t>(v);
+        mIsOverflowValue = false;
+    }
+}
+
+void STAmount::set_128 (boost::multiprecision::uint128_t v)
+{
+    if (v < 0)
+    {
+        mIsNegative = true;
+        mValueOverflow = static_cast<boost::multiprecision::uint128_t>(0 + v);
+        mIsOverflowValue = true;
+    }
+    else
+    {
+        mIsNegative = false;
+        mValueOverflow = static_cast<boost::multiprecision::uint128_t>(v);
+        mIsOverflowValue = true;
     }
 }
 

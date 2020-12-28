@@ -31,6 +31,7 @@
 #include <casinocoin/basics/contract.h>
 #include <casinocoin/basics/Buffer.h>
 #include <casinocoin/basics/Slice.h>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <cassert>
 #include <cstdint>
 #include <iomanip>
@@ -87,6 +88,7 @@ public:
     int add32 (std::uint32_t);      // ledger indexes, account sequence, timestamps
     int add64 (std::uint64_t);      // native currency amounts
     int add128 (const uint128&);    // private key generators
+    int add128boost (boost::multiprecision::uint128_t); // boost 128 uint
     int add256 (uint256 const& );       // transaction and ledger hashes
 
     template <typename Integer>
@@ -350,6 +352,9 @@ public:
 
     std::uint64_t
     get64();
+
+    boost::multiprecision::uint128_t
+    get128boost();
 
     template <int Bits, class Tag = void>
     base_uint<Bits, Tag>
